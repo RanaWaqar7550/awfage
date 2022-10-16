@@ -1,7 +1,8 @@
-import { literal } from 'sequelize';
+import { Op } from 'sequelize';
 
 import Event from './entities/event.entity';
 import Workshop from './entities/workshop.entity';
+import { mapEventsWithWorkshops } from '../utils';
 
 
 export class EventsService {
@@ -90,12 +91,9 @@ export class EventsService {
   async getEventsWithWorkshops() {
     try {
       const events = await Event.findAll({ raw: true });
-      const eventIds = events.map(({ id }) => id);
+      const eventIds = events.flatMap(({ id }) => id || []);
       const workShops = await Workshop.findAll({ where: { eventId: eventIds }, raw: true });
-      const response = events.map((event: Event & { workshops: Array<Workshop> }) => {
-        const workShop = workShops.filter(({ eventId }) => eventId === event.id);
-        return { ...event, workshops: workShop };
-      });
+      const response = mapEventsWithWorkshops(events, workShops);
       return response;
     } catch (err) {
       console.log(err);
@@ -170,6 +168,9 @@ export class EventsService {
     ```
      */
   async getFutureEventWithWorkshops() {
-    throw new Error('TODO task 2');
+    const workshops = await Workshop.findAll({ where: { start: { [Op.gt]: new Date() } }, raw: true });
+    const eventIds = workshops.flatMap(({ eventId }) => eventId || []);
+    const events = await Event.findAll({ where: { id: eventIds }, raw: true });
+    return mapEventsWithWorkshops(events, workshops);
   }
 }
